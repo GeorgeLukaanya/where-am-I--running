@@ -52,6 +52,8 @@ def api_info():
 
 MAX_SLEEP_SECONDS = 30
 
+DEFAULT_READINESS_MARKER = os.getenv("READINESS_MARKER", "/tmp/shutdown")
+
 
 @bp.get("/api/slow")
 def slow():
@@ -73,11 +75,38 @@ def slow():
 
 
 @bp.get("/health")
-def health():
-    """Liveness only.
+@bp.get("/health/live")
+def live():
+    """Liveness: is this process wedged?
 
-    Deliberately does not touch Redis. If a dependency is unreachable the
-    application is still serving, and failing this check would pull a working
-    container out of the load balancer for no reason.
+    A failure here means "restart me". It deliberately touches nothing else --
+    checking a dependency from a liveness probe turns a Redis outage into a
+    restart loop across every replica at once.
+
+    /health is kept as an alias: the container HEALTHCHECK uses it.
     """
     return jsonify({"status": "ok"})
+
+
+@bp.get("/health/ready")
+def ready():
+    """Readiness: should this pod be sent traffic right now?
+
+    A failure here means "take me out of the load balancer, but leave me
+    running" -- a different instruction from liveness, and the reason the two
+    are separate endpoints.
+
+    Note what is *not* checked: Redis. The app degrades gracefully without it,
+    so a Redis outage failing readiness would empty the Service of every
+    healthy replica simultaneously, converting a lost feature into a lost site.
+
+    What does fail it is shutdown. A preStop hook drops the marker file and
+    then waits, so Kubernetes removes this pod from the endpoint list before
+    the server stops accepting connections. Without that gap the endpoints
+    still name a pod that has already closed its listener, and a handful of
+    requests fail on every single deploy.
+    """
+    marker = current_app.config.get("READINESS_MARKER", DEFAULT_READINESS_MARKER)
+    if os.path.exists(marker):
+        return jsonify({"status": "shutting down"}), 503
+    return jsonify({"status": "ready"})

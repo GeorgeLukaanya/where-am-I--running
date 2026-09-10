@@ -257,7 +257,70 @@ def test_counter_availability_drops_when_the_backend_fails(client):
 
 def test_health_checks_are_kept_out_of_request_metrics(client):
     client.get("/health")
+    client.get("/health/live")
+    client.get("/health/ready")
 
-    # The healthcheck runs every 30s forever. Counting it would swamp the
-    # request-rate graph with traffic nobody sent.
-    assert "main.health" not in scrape(client)
+    # Probes run every few seconds per pod, forever. Counting them would swamp
+    # the request-rate graph with traffic nobody sent.
+    body = scrape(client)
+    assert "main.live" not in body
+    assert "main.ready" not in body
+
+
+# --- liveness and readiness --------------------------------------------------
+#
+# Two different questions, and conflating them is how a dependency outage turns
+# into a total one.
+#
+#   liveness:  is this process wedged? if so, restart it.
+#   readiness: should this pod receive traffic right now? if not, take it out of
+#              the load balancer -- but leave it running.
+
+
+def test_liveness_is_always_ok(client):
+    response = client.get("/health/live")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ok"}
+
+
+def test_health_is_an_alias_for_liveness(client):
+    # The container HEALTHCHECK and older callers still use /health.
+    assert client.get("/health").status_code == 200
+
+
+def test_readiness_is_ok_while_serving(client):
+    response = client.get("/health/ready")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"status": "ready"}
+
+
+def test_readiness_survives_a_broken_dependency(client):
+    class BrokenCounter:
+        backend = "redis (unavailable)"
+
+        def increment(self):
+            return None
+
+    client.application.config["COUNTER"] = BrokenCounter()
+
+    # Redis being down degrades a feature; the pod can still serve. Failing
+    # readiness here would empty the load balancer of every healthy replica at
+    # once -- one broken dependency becoming a total outage.
+    assert client.get("/health/ready").status_code == 200
+
+
+def test_readiness_fails_once_shutdown_has_begun(client, tmp_path):
+    marker = tmp_path / "shutdown"
+    client.application.config["READINESS_MARKER"] = str(marker)
+    marker.touch()
+
+    response = client.get("/health/ready")
+
+    # A preStop hook drops this marker and then waits, so the pod is pulled out
+    # of the Service *before* it stops accepting connections. Without that gap
+    # the endpoint list still names a pod that has already closed its listener,
+    # and those requests fail during every deploy.
+    assert response.status_code == 503
+    assert response.get_json() == {"status": "shutting down"}

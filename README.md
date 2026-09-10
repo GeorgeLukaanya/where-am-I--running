@@ -16,7 +16,9 @@ report its own ceiling.
 | --- | --- |
 | `GET /` | HTML card showing the runtime details |
 | `GET /api/info` | The same details as JSON |
-| `GET /health` | `{"status": "ok"}` — liveness, used by the container `HEALTHCHECK` |
+| `GET /health/live` | Liveness — is the process wedged? A failure means restart me |
+| `GET /health/ready` | Readiness — should I be sent traffic? A failure means take me out of the load balancer |
+| `GET /health` | Alias for `/health/live`, used by the container `HEALTHCHECK` |
 | `GET /metrics` | Prometheus exposition format |
 | `GET /api/slow?seconds=N` | Holds the request open, for observing shutdown draining |
 
@@ -111,11 +113,24 @@ docker compose down -v                     # -v destroys the volume too
 ```
 
 **When Redis is down the app degrades, it does not fail.** `increment()` catches
-the connection error, the page reports `redis (unavailable)`, and `/health`
-still returns 200 — because the application *is* healthy; only a feature is
-missing. A health check that reported failure there would have the load balancer
-pull perfectly good containers out of rotation, turning one broken dependency
-into a total outage.
+the connection error, the page reports `redis (unavailable)`, and both probes
+still return 200 — because the application *is* healthy; only a feature is
+missing. A probe that reported failure there would pull perfectly good replicas
+out of rotation all at once, turning one broken dependency into a total outage.
+
+### Liveness and readiness are different questions
+
+- **`/health/live`** — is this process wedged? A failure means *restart me*. It
+  deliberately checks nothing else: a dependency check in a liveness probe turns
+  an outage into a restart loop across every replica simultaneously.
+- **`/health/ready`** — should this instance be sent traffic right now? A failure
+  means *take me out of the load balancer, but leave me running*.
+
+What fails readiness is shutdown. A preStop hook drops a marker file and then
+waits, so the orchestrator removes the instance from its endpoint list before
+the server stops accepting connections. Without that gap the endpoints still
+name a process that has already closed its listener, and a handful of requests
+fail on every single deploy.
 
 ## Resource limits
 

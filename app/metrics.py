@@ -11,7 +11,10 @@ import os
 from flask import current_app
 from prometheus_client import REGISTRY, CollectorRegistry, Gauge
 
-EXCLUDED_PATHS = ["/health", "/metrics"]
+# Matched as regexes. Kubernetes runs liveness and readiness probes every
+# few seconds per pod, so this is far more traffic than the Docker
+# healthcheck was -- counting it would bury the real request rate.
+EXCLUDED_PATHS = ["/health.*", "/metrics"]
 
 
 def install(app) -> None:
