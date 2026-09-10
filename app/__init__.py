@@ -2,6 +2,7 @@
 
 from flask import Flask
 
+from app import metrics
 from app.store import make_counter
 
 
@@ -15,4 +16,5 @@ def create_app() -> Flask:
     from app.main import bp
 
     app.register_blueprint(bp)
+    metrics.install(app)
     return app

@@ -8,6 +8,7 @@ import time
 from flask import Blueprint, current_app, jsonify, render_template, request
 
 from app.limits import read_limits
+from app.metrics import record_visit
 
 bp = Blueprint("main", __name__)
 
@@ -34,7 +35,9 @@ def build_info() -> dict:
 def visit_info() -> dict:
     """Record this visit and describe where the count is kept."""
     counter = current_app.config["COUNTER"]
-    return {"visits": counter.increment(), "counter_backend": counter.backend}
+    count = counter.increment()
+    record_visit(count)
+    return {"visits": count, "counter_backend": counter.backend}
 
 
 @bp.get("/")

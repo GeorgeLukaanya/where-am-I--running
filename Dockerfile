@@ -18,12 +18,16 @@ LABEL org.opencontainers.image.title="where-am-i-running" \
       org.opencontainers.image.source="https://github.com/GeorgeLukaanya/where-am-I--running" \
       org.opencontainers.image.revision="${GIT_SHA}"
 
+# PROMETHEUS_MULTIPROC_DIR is where gunicorn's workers mirror their counters,
+# so /metrics can sum across them instead of reporting whichever worker happened
+# to serve the scrape.
 ENV GIT_SHA=${GIT_SHA} \
     IMAGE_TAG=${IMAGE_TAG} \
     APP_ENV=production \
     PORT=8000 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
 
 COPY --from=builder /install /usr/local
 

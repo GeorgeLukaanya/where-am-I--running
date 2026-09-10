@@ -203,3 +203,61 @@ def test_slow_endpoint_caps_the_wait(client, monkeypatch):
 
 def test_slow_endpoint_rejects_nonsense(client):
     assert client.get("/api/slow?seconds=abc").status_code == 400
+
+
+# --- metrics -----------------------------------------------------------------
+
+
+def scrape(client) -> str:
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    return response.get_data(as_text=True)
+
+
+def test_metrics_endpoint_reports_request_timings(client):
+    client.get("/api/info")
+
+    body = scrape(client)
+
+    assert "flask_http_request_duration_seconds" in body
+    assert "main.api_info" in body
+
+
+def test_metrics_carry_build_metadata(client):
+    body = scrape(client)
+
+    # A labelled gauge fixed at 1 -- the conventional way to publish build
+    # metadata, since Prometheus has no string values. It lets a dashboard
+    # display the running commit and an alert notice a rollback.
+    assert 'app_build_info{' in body
+    assert 'git_sha="unknown"' in body
+
+
+def test_metrics_expose_counter_health_and_visits(client):
+    client.get("/api/info")
+
+    body = scrape(client)
+
+    assert "app_counter_available 1.0" in body
+    assert "app_visits" in body
+
+
+def test_counter_availability_drops_when_the_backend_fails(client):
+    class BrokenCounter:
+        backend = "broken"
+
+        def increment(self):
+            return None
+
+    client.application.config["COUNTER"] = BrokenCounter()
+    client.get("/api/info")
+
+    assert "app_counter_available 0.0" in scrape(client)
+
+
+def test_health_checks_are_kept_out_of_request_metrics(client):
+    client.get("/health")
+
+    # The healthcheck runs every 30s forever. Counting it would swamp the
+    # request-rate graph with traffic nobody sent.
+    assert "main.health" not in scrape(client)
