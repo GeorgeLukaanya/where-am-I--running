@@ -9,3 +9,5 @@ tests
 requirements-dev.txt
 README.md
 .gitignore
+docker-compose.yml
+nginx

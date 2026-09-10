@@ -101,3 +101,45 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/python -m pytest -v
 ```
+
+## Beyond the exercise
+
+The four steps above are the graded exercise. What follows demonstrates what
+containers are actually *for* — the plain `docker build` / `docker run`
+commands above keep working unchanged.
+
+### Load balancing across replicas
+
+`docker-compose.yml` runs the app behind an nginx reverse proxy, so the same
+image can be scaled to several containers sharing one address.
+
+```bash
+docker compose up -d --build --scale web=3
+docker compose ps          # 3 web replicas + 1 proxy
+```
+
+The stack is served on **http://localhost:8085** (the proxy). The replicas
+themselves publish no host port — they are reachable only inside the Docker
+network, which is how this is normally arranged.
+
+```bash
+for i in $(seq 1 6); do curl -s localhost:8085/api/info | grep -o '"hostname":"[^"]*"'; done
+```
+
+More than one container ID comes back: requests are being spread across the
+replicas. Open http://localhost:8085 and hold refresh to watch the Hostname
+row change.
+
+```bash
+docker compose down        # stop the stack
+```
+
+**One trap worth knowing about.** nginx resolves a literal `proxy_pass
+http://web:8000` — or an `upstream { server web:8000; }` block — exactly once,
+when it starts, and pins the single IP it receives for the life of the
+process. Every request then lands on the same replica, and the demo looks like
+it is doing nothing while the configuration appears perfectly correct. The fix
+is in `nginx/default.conf`: point `proxy_pass` at a *variable*, which defers
+DNS resolution to request time, and declare Docker's embedded DNS server
+(`resolver 127.0.0.11`). Docker publishes one A record per replica and rotates
+them, so each request gets a different one.
