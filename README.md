@@ -22,6 +22,18 @@ report its own ceiling.
 | `GET /metrics` | Prometheus exposition format |
 | `GET /api/slow?seconds=N` | Holds the request open, for observing shutdown draining |
 
+## Documentation
+
+| Document | What it covers |
+| --- | --- |
+| [Requirements](docs/srs.md) | What the system must do and how well, with numbered requirements and a traceability table back to the code and tests |
+| [Architecture](docs/architecture.md) | Context and container views, deployment topologies, the ten decisions that shaped the system, known weaknesses, and the planned Kubernetes target |
+| [System design](docs/system-design.md) | Components, interfaces, request and shutdown sequences, the concurrency model, and every failure mode with its response |
+| [Data design](docs/data-design.md) | Every piece of data the system holds, where it lives, exactly how long it survives, and the metric cardinality rules |
+
+Start with the architecture document if you want to know *why* the system looks
+like this; start with the system design if you want to know *how it works*.
+
 ## Quick start
 
 ```bash
