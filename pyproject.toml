@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Invoking `pytest` directly does not put the project root on sys.path, while
+# `python -m pytest` does -- so the suite passed locally and failed in CI on the
+# same commit. Stating the path here makes the two invocations equivalent.
+pythonpath = ["."]
+testpaths = ["tests"]
