@@ -143,3 +143,50 @@ is in `nginx/default.conf`: point `proxy_pass` at a *variable*, which defers
 DNS resolution to request time, and declare Docker's embedded DNS server
 (`resolver 127.0.0.11`). Docker publishes one A record per replica and rotates
 them, so each request gets a different one.
+
+### A second service: shared state in Redis
+
+The compose stack also runs a Redis container, and the app counts visits into
+it. The counter backend is chosen at runtime by whether `REDIS_URL` is set —
+the image is identical either way.
+
+**Without Redis, state is per-container.** Run a few replicas with no Redis and
+the count jumps about, because each container is counting on its own:
+
+```bash
+docker compose run --rm -e REDIS_URL= -p 8086:8000 web   # one replica, no Redis
+curl -s localhost:8086/api/info    # "counter_backend": "in-memory"
+```
+
+**With Redis, the replicas share one number.** That is the whole stack:
+
+```bash
+docker compose up -d --build --scale web=3
+for i in $(seq 1 5); do curl -s localhost:8085/api/info | grep -o '"visits":[0-9]*'; done
+```
+
+The count climbs 1, 2, 3, 4, 5 even though the hostname keeps changing — three
+separate containers, one shared counter. The app reaches it at
+`redis://redis:6379/0`: a **service name**, not an address. Docker's embedded
+DNS resolves it on the compose network, which is why the same image finds Redis
+in any environment that provides a host called `redis`.
+
+**The volume is what actually persists.** Redis writes to `/data`, which is a
+named volume rather than the container's writable layer:
+
+```bash
+docker compose down                        # containers destroyed, volume kept
+docker compose up -d --scale web=3
+curl -s localhost:8085/api/info | grep -o '"visits":[0-9]*'   # carries on
+
+docker compose down -v                     # -v also destroys the volume
+docker compose up -d --scale web=3
+curl -s localhost:8085/api/info | grep -o '"visits":[0-9]*'   # back to 1
+```
+
+**When Redis is down the app degrades, it does not fail.** `increment()`
+catches the connection error, the page reports `redis (unavailable)`, and
+`/health` still returns 200 — because the application *is* healthy; only a
+feature is missing. A health check that reported failure here would have the
+load balancer pull a perfectly good container out of rotation, and in a real
+outage that turns one broken dependency into a total one.

@@ -72,6 +72,8 @@
       <div class="row"><dt>Git SHA</dt><dd>{{ info.git_sha }}</dd></div>
       <div class="row"><dt>Python</dt><dd>{{ info.python_version }}</dd></div>
       <div class="row"><dt>Uptime</dt><dd>{{ info.uptime_seconds }}s</dd></div>
+      <div class="row"><dt>Visits</dt><dd>{{ info.visits if info.visits is not none else "&mdash;" | safe }}</dd></div>
+      <div class="row"><dt>Counted in</dt><dd>{{ info.counter_backend }}</dd></div>
     </dl>
     <footer>Inside a container the hostname is the container ID &mdash; run two and compare. JSON at <a href="/api/info">/api/info</a>.</footer>
   </main>

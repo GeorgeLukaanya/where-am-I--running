@@ -13,8 +13,25 @@ services:
     image: georgelukaanya/where-am-i-running:compose
     environment:
       APP_ENV: production
+      # A service name, not an address. Docker's embedded DNS resolves it on
+      # this network -- that is service discovery, and it is why the same image
+      # needs no rebuild to find Redis in any other environment.
+      REDIS_URL: redis://redis:6379/0
     expose:
       - "8000"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Shared state, so every replica counts into the same place.
+  redis:
+    image: redis:7-alpine
+    # Append-only file, so the count survives the container being replaced --
+    # but only because the data lives on the named volume below, not in the
+    # container's own writable layer.
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
     restart: unless-stopped
 
   # The load balancer. Requests arrive here and are spread over the replicas.
@@ -27,3 +44,6 @@ services:
     depends_on:
       - web
     restart: unless-stopped
+
+volumes:
+  redis-data:

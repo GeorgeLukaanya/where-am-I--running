@@ -5,7 +5,7 @@ import platform
 import socket
 import time
 
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, current_app, jsonify, render_template
 
 bp = Blueprint("main", __name__)
 
@@ -28,16 +28,28 @@ def build_info() -> dict:
     }
 
 
+def visit_info() -> dict:
+    """Record this visit and describe where the count is kept."""
+    counter = current_app.config["COUNTER"]
+    return {"visits": counter.increment(), "counter_backend": counter.backend}
+
+
 @bp.get("/")
 def index():
-    return render_template("index.html", info=build_info())
+    return render_template("index.html", info={**build_info(), **visit_info()})
 
 
 @bp.get("/api/info")
 def api_info():
-    return jsonify(build_info())
+    return jsonify({**build_info(), **visit_info()})
 
 
 @bp.get("/health")
 def health():
+    """Liveness only.
+
+    Deliberately does not touch Redis. If a dependency is unreachable the
+    application is still serving, and failing this check would pull a working
+    container out of the load balancer for no reason.
+    """
     return jsonify({"status": "ok"})
