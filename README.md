@@ -243,3 +243,37 @@ Two details in the Dockerfile make that work:
 - `graceful_timeout = 30` in `gunicorn.conf.py` sets how long workers may take
   to finish. Note it exceeds Docker's 10-second grace period, so for a genuinely
   slow drain you would stop the container with `docker stop -t 40`.
+
+### A hardened pipeline
+
+`.github/workflows/docker-build.yml` now runs three jobs in sequence:
+
+**`test`** — pytest, as before.
+
+**`smoke`** — starts the whole compose stack with three replicas, waits for the
+proxy, then asserts that a dozen requests reach more than one container and
+that the visit count increments by exactly one across replicas. Unit tests
+prove the Python is right; this proves the *stack* is right. Without it a
+broken nginx config or compose file would sail through CI untouched, because
+no unit test loads either file.
+
+**`docker`** — builds, scans, and publishes:
+
+- **Vulnerability scanning.** Trivy fails the build on HIGH or CRITICAL
+  findings. It cannot scan a multi-architecture manifest, and cannot scan an
+  image that only exists in a registry, so the job builds one architecture into
+  the local daemon first (`load: true`), scans that, and pushes afterwards —
+  the layer cache makes the second build nearly free. `ignore-unfixed: true`
+  matters: `python:3.12-slim` always carries some Debian CVEs with no fix
+  released, and failing on those just trains everyone to ignore the gate.
+- **Multi-architecture builds.** QEMU emulation plus
+  `platforms: linux/amd64,linux/arm64` produces one tag that works on x86
+  servers *and* Apple Silicon or Raspberry Pi. Docker Hub shows both under the
+  same tag; the client picks the right one automatically.
+- **SBOM and provenance.** A CycloneDX software bill of materials is uploaded
+  as a workflow artifact, and `sbom: true` / `provenance: mode=max` attach
+  attestations to the pushed image — so anyone can ask what is inside it and
+  which commit and workflow built it. This is what "supply chain security"
+  means in practice.
+- **Pull requests build and scan, but never push.** A review gets the
+  verification without anything being published.

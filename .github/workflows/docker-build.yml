@@ -29,22 +29,64 @@ jobs:
       - name: Run tests
         run: pytest -v
 
-  docker:
+  # Unit tests prove the Python is right. This proves the *stack* is right:
+  # that the image builds, the replicas come up behind the proxy, requests are
+  # spread across them, and Redis is shared. Without it, a broken nginx config
+  # or compose file would sail through CI untouched.
+  smoke:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Start the stack
+        run: docker compose up -d --build --scale web=3
 
-      # Only sign in when we are actually going to publish: pull requests
-      # verify that the image builds, they do not push it.
-      - name: Log in to Docker Hub
-        if: github.event_name == 'push'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Wait for the proxy to answer
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sf localhost:8085/health >/dev/null; then
+              echo "stack is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "stack never became healthy" >&2
+          exit 1
+
+      - name: Requests are spread across replicas
+        run: |
+          seen=$(for _ in $(seq 1 12); do
+            curl -s localhost:8085/api/info \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["hostname"])'
+          done | sort -u | wc -l)
+          echo "distinct replicas seen: $seen"
+          test "$seen" -gt 1
+
+      - name: The visit count is shared, not per-container
+        run: |
+          first=$(curl -s localhost:8085/api/info | python3 -c 'import json,sys; print(json.load(sys.stdin)["visits"])')
+          second=$(curl -s localhost:8085/api/info | python3 -c 'import json,sys; print(json.load(sys.stdin)["visits"])')
+          echo "$first then $second"
+          test "$second" -eq "$((first + 1))"
+
+      - name: Stack logs
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  docker:
+    needs: [test, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Emulation for building architectures this runner is not.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
       - name: Derive image tags
         id: meta
@@ -55,15 +97,74 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
 
-      - name: Build and push
+      # Trivy cannot scan a multi-architecture manifest, and it cannot scan an
+      # image that only ever existed in the registry. So build one architecture
+      # into the local daemon first, scan that, and push afterwards -- the
+      # layer cache makes the second build nearly free.
+      - name: Build for scanning
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name == 'push' }}
+          load: true
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE_NAME }}:scan
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:scan
+          severity: HIGH,CRITICAL
+          # A base image always carries some distro CVEs with no fix released.
+          # Failing on those trains everyone to ignore the gate.
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+      - name: Generate an SBOM
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:scan
+          scan-type: image
+          format: cyclonedx
+          output: sbom.cdx.json
+
+      - name: Publish the SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+
+      # Pull requests stop here: the image has been built and scanned, which is
+      # what a review needs. Nothing is published.
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # amd64 for servers, arm64 for Apple Silicon and Raspberry Pi.
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             GIT_SHA=${{ github.sha }}
             IMAGE_TAG=${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}
+          # Attach a bill of materials and a build-provenance attestation to
+          # the pushed image, so a consumer can ask what is inside it and where
+          # it came from.
+          sbom: true
+          provenance: mode=max
           cache-from: type=gha
           cache-to: type=gha,mode=max
