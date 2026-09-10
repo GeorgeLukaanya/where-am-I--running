@@ -1,10 +1,12 @@
 """Tests for the "Where am I running?" app."""
 
 import socket
+import time
 
 import pytest
 
 from app import create_app
+from app.limits import read_limits
 from app.store import InMemoryCounter, RedisCounter, make_counter
 
 
@@ -109,3 +111,95 @@ def test_health_stays_ok_when_the_counter_is_broken(client):
     # check that fails here would take a serving container out of rotation for
     # no reason.
     assert client.get("/health").status_code == 200
+
+
+# --- cgroup limits -----------------------------------------------------------
+#
+# read_limits() takes the cgroup root as an argument precisely so these tests
+# can hand it a directory of fixture files instead of mocking open().
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+def test_reads_cgroup_v2_limits(tmp_path):
+    write(tmp_path / "memory.max", "134217728\n")
+    write(tmp_path / "cpu.max", "50000 100000\n")
+
+    assert read_limits(tmp_path) == {"memory_limit": "128 MB", "cpu_limit": "0.5 CPUs"}
+
+
+def test_reads_cgroup_v2_without_limits(tmp_path):
+    write(tmp_path / "memory.max", "max\n")
+    write(tmp_path / "cpu.max", "max 100000\n")
+
+    assert read_limits(tmp_path) == {
+        "memory_limit": "unlimited",
+        "cpu_limit": "unlimited",
+    }
+
+
+def test_falls_back_to_cgroup_v1_layout(tmp_path):
+    write(tmp_path / "memory" / "memory.limit_in_bytes", "268435456\n")
+    write(tmp_path / "cpu" / "cpu.cfs_quota_us", "200000\n")
+    write(tmp_path / "cpu" / "cpu.cfs_period_us", "100000\n")
+
+    assert read_limits(tmp_path) == {"memory_limit": "256 MB", "cpu_limit": "2 CPUs"}
+
+
+def test_cgroup_v1_sentinel_value_means_unlimited(tmp_path):
+    # cgroup v1 has no "max": an unlimited memory cgroup reports a number near
+    # the top of a signed 64-bit integer instead.
+    write(tmp_path / "memory" / "memory.limit_in_bytes", "9223372036854771712\n")
+    write(tmp_path / "cpu" / "cpu.cfs_quota_us", "-1\n")
+    write(tmp_path / "cpu" / "cpu.cfs_period_us", "100000\n")
+
+    assert read_limits(tmp_path) == {
+        "memory_limit": "unlimited",
+        "cpu_limit": "unlimited",
+    }
+
+
+def test_missing_cgroup_files_report_unlimited(tmp_path):
+    assert read_limits(tmp_path) == {
+        "memory_limit": "unlimited",
+        "cpu_limit": "unlimited",
+    }
+
+
+def test_api_info_reports_the_limits(client):
+    info = client.get("/api/info").get_json()
+
+    assert "memory_limit" in info
+    assert "cpu_limit" in info
+
+
+# --- graceful shutdown -------------------------------------------------------
+
+
+def test_slow_endpoint_waits_before_answering(client):
+    started = time.monotonic()
+    response = client.get("/api/slow?seconds=0.2")
+
+    assert response.status_code == 200
+    assert response.get_json()["slept_seconds"] == 0.2
+    assert time.monotonic() - started >= 0.2
+
+
+def test_slow_endpoint_caps_the_wait(client, monkeypatch):
+    # Nobody gets to hold a worker open for an hour. Assert on what the route
+    # asks to sleep for rather than waiting it out -- a test suite that takes
+    # 30 seconds to prove a cap is a test suite nobody runs.
+    slept = []
+    monkeypatch.setattr("time.sleep", slept.append)
+
+    body = client.get("/api/slow?seconds=9999").get_json()
+
+    assert body["slept_seconds"] == 30
+    assert slept == [30]
+
+
+def test_slow_endpoint_rejects_nonsense(client):
+    assert client.get("/api/slow?seconds=abc").status_code == 400

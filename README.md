@@ -190,3 +190,56 @@ catches the connection error, the page reports `redis (unavailable)`, and
 feature is missing. A health check that reported failure here would have the
 load balancer pull a perfectly good container out of rotation, and in a real
 outage that turns one broken dependency into a total one.
+
+### Resource limits, and what a container actually is
+
+A container is not a small virtual machine. It is an ordinary process on the
+host kernel, fenced in by **namespaces** (what it can see) and **cgroups**
+(what it can use). The kernel exposes the second half as files, so the process
+can read its own limits — which is why the page can show them:
+
+```bash
+docker run -d --name wair-limited -m 128m --cpus 0.5 -p 8086:8000 \
+  georgelukaanya/where-am-i-running:latest
+curl -s localhost:8086/api/info | grep -o '"\(memory\|cpu\)_limit":"[^"]*"'
+```
+
+Reports `128 MB` and `0.5 CPUs`. Run it without those flags and both say
+`unlimited` — same image, and nothing about the app changed. `app/limits.py`
+reads cgroup v2 (`memory.max`, `cpu.max`) and falls back to the v1 layout.
+
+Proof it is a real limit rather than a label — this gets killed:
+
+```bash
+docker run --rm -m 32m georgelukaanya/where-am-i-running:latest \
+  python -c "x = bytearray(200 * 1024 * 1024)"
+echo "exit code: $?"   # 137 = SIGKILL, the OOM killer
+```
+
+### Graceful shutdown
+
+`docker stop` sends **SIGTERM**, waits 10 seconds, then **SIGKILL**s. A well
+behaved container uses that window to finish the requests it is already
+serving. `/api/slow` exists to make it observable:
+
+```bash
+docker run -d --name wair-drain -p 8087:8000 georgelukaanya/where-am-i-running:latest
+curl -s "localhost:8087/api/slow?seconds=8" &   # a request in flight
+sleep 1
+docker stop wair-drain                          # ask it to stop, politely
+docker logs wair-drain
+```
+
+The logs show `Handling signal: term`, the worker draining, then
+`shutdown complete` — and the backgrounded `curl` still gets its answer.
+
+Two details in the Dockerfile make that work:
+
+- `CMD ["sh", "-c", "exec gunicorn ..."]` — **`exec` matters.** Without it the
+  shell remains PID 1, and a shell does not forward signals to its children,
+  so gunicorn would never hear the SIGTERM and the container would be killed
+  mid-request 10 seconds later. This is the single most common reason a
+  containerised app drops requests on every deploy.
+- `graceful_timeout = 30` in `gunicorn.conf.py` sets how long workers may take
+  to finish. Note it exceeds Docker's 10-second grace period, so for a genuinely
+  slow drain you would stop the container with `docker stop -t 40`.
