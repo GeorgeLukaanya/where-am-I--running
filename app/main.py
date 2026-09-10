@@ -7,6 +7,7 @@ import time
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 
+from app.identity import accent_hue
 from app.limits import read_limits
 from app.metrics import record_visit
 
@@ -42,7 +43,10 @@ def visit_info() -> dict:
 
 @bp.get("/")
 def index():
-    return render_template("index.html", info={**build_info(), **visit_info()})
+    info = {**build_info(), **visit_info()}
+    # Tint server-side so the page is already the right colour on first paint,
+    # and still correct with JavaScript switched off.
+    return render_template("index.html", info=info, hue=accent_hue(info["hostname"]))
 
 
 @bp.get("/api/info")

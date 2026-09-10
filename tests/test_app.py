@@ -6,6 +6,7 @@ import time
 import pytest
 
 from app import create_app
+from app.identity import accent_hue
 from app.limits import read_limits
 from app.store import InMemoryCounter, RedisCounter, make_counter
 
@@ -324,3 +325,23 @@ def test_readiness_fails_once_shutdown_has_begun(client, tmp_path):
     # and those requests fail during every deploy.
     assert response.status_code == 503
     assert response.get_json() == {"status": "shutting down"}
+
+
+# --- instance identity colour ------------------------------------------------
+
+
+def test_accent_hue_is_stable_for_a_hostname():
+    assert accent_hue("3731a4862174") == accent_hue("3731a4862174")
+
+
+def test_accent_hue_is_always_a_valid_hue():
+    for host in ("3731a4862174", "feacdc02a322", "localhost", "", "a"):
+        assert 0 <= accent_hue(host) < 360
+
+
+def test_different_instances_generally_differ():
+    hosts = ["3731a4862174", "feacdc02a322", "42da6c39007b", "c51650a870c2"]
+
+    # Not a guarantee -- 360 hues will collide eventually -- but a spread this
+    # small colliding would mean the derivation is not using the whole name.
+    assert len({accent_hue(h) for h in hosts}) == len(hosts)

@@ -18,10 +18,11 @@ be readable in one sitting.
 | Module | Lines | Responsibility | Depends on |
 | --- | --- | --- | --- |
 | `app/__init__.py` | 20 | Application factory: build the app, choose the counter, install metrics | `store`, `metrics`, `main` |
-| `app/main.py` | 112 | The routes, and assembling the information payload | `limits`, `metrics` |
+| `app/main.py` | 116 | The routes, and assembling the information payload | `limits`, `metrics`, `identity` |
 | `app/store.py` | 72 | The visit counter and its two backends | `redis` |
 | `app/limits.py` | 73 | Reading cgroup limits from the kernel | — |
 | `app/metrics.py` | 95 | Prometheus instrumentation and custom gauges | `prometheus_client` |
+| `app/identity.py` | 19 | Derives a stable colour from an instance's name | — |
 | `wsgi.py` | 5 | The entry point gunicorn imports | `app` |
 | `gunicorn.conf.py` | 53 | Server settings, and the metrics directory lifecycle | — |
 
@@ -41,13 +42,26 @@ graph TD
     factory --> metrics["app/metrics.py<br/>instrumentation"]
     factory --> main["app/main.py<br/>routes"]
     main --> limits["app/limits.py<br/>cgroup reader"]
+    main --> identity["app/identity.py<br/>instance colour"]
     main --> metrics
     store --> redis[(Redis)]
     limits --> cgroup["/sys/fs/cgroup"]
 ```
 
-Dependencies point one way, inward from the entry point. `limits.py` depends on
-nothing at all, which is why it is the easiest module to test.
+Dependencies point one way, inward from the entry point. `limits.py` and
+`identity.py` depend on nothing at all, which is why they are the easiest
+modules to test.
+
+### 1.3 One deliberate duplication
+
+`accent_hue()` exists twice: in `app/identity.py` and again in the page's
+script. The server needs it so the page is correctly tinted on first paint
+and without JavaScript; the browser needs it to colour bars for replicas it
+discovers, which the server never sees. Sharing one implementation would mean
+shipping a hue lookup in every response or an endpoint that exists only to
+hash a string. Four lines of arithmetic, duplicated knowingly and tested on
+the Python side, is the cheaper trade — but the two must stay in step, and a
+comment in each says so.
 
 ---
 
