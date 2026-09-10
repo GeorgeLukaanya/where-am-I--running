@@ -30,6 +30,9 @@ class InMemoryCounter:
         self._count += 1
         return self._count
 
+    def read(self) -> int:
+        return self._count
+
 
 class RedisCounter:
     """Counts in a Redis service shared by every replica.
@@ -58,6 +61,20 @@ class RedisCounter:
             return None
         self._available = True
         return count
+
+    def read(self) -> int | None:
+        """The current count, without recording a visit.
+
+        The console polls constantly; if looking at the number changed it, the
+        console would be measuring itself.
+        """
+        try:
+            value = self._client.get(self._key)
+        except RedisError:
+            self._available = False
+            return None
+        self._available = True
+        return int(value or 0)
 
 
 def make_counter(url: str | None = None):

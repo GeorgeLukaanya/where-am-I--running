@@ -14,7 +14,7 @@ from prometheus_client import REGISTRY, CollectorRegistry, Gauge
 # Matched as regexes. Kubernetes runs liveness and readiness probes every
 # few seconds per pod, so this is far more traffic than the Docker
 # healthcheck was -- counting it would bury the real request rate.
-EXCLUDED_PATHS = ["/health.*", "/metrics"]
+EXCLUDED_PATHS = ["/health.*", "/metrics", "/api/instance", "/api/fleet"]
 
 
 def install(app) -> None:
@@ -51,6 +51,7 @@ def install(app) -> None:
         registry = CollectorRegistry()
         Metrics(app, registry=registry, **options)
 
+    app.config["METRIC_REGISTRY"] = registry
     app.config["GAUGES"] = _build_gauges(registry)
     app.config["GAUGES"]["build_info"].labels(
         git_sha=os.getenv("GIT_SHA", "unknown"),

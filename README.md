@@ -14,11 +14,13 @@ report its own ceiling.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /` | HTML card showing the runtime details |
+| `GET /` | Fleet console: live metrics for every instance |
 | `GET /api/info` | The same details as JSON |
 | `GET /health/live` | Liveness — is the process wedged? A failure means restart me |
 | `GET /health/ready` | Readiness — should I be sent traffic? A failure means take me out of the load balancer |
 | `GET /health` | Alias for `/health/live`, used by the container `HEALTHCHECK` |
+| `GET /api/instance` | This instance's facts and counters, as JSON. Records no visit |
+| `GET /api/fleet` | Every instance behind the peer service, each with its counters |
 | `GET /metrics` | Prometheus exposition format |
 | `GET /api/slow?seconds=N` | Holds the request open, for observing shutdown draining |
 
@@ -196,6 +198,36 @@ Two details make that work:
 - `graceful_timeout = 30` in `gunicorn.conf.py` sets how long workers may take
   to finish. It exceeds Docker's 10-second grace period, so a genuinely slow
   drain needs `docker stop -t 40`.
+
+## The console
+
+`/` is a live fleet view rather than a page about one container. Every instance
+resolves `PEER_SERVICE` through the container DNS, polls each address it finds,
+and returns the fleet — so the console shows all five replicas whichever one
+happens to serve it, and scaling with `--scale` changes the view within one poll
+with nothing to configure.
+
+What it draws: requests per second, mean latency, errors per second and uptime,
+one line per instance, over a window you choose. Counters are reported as
+running totals and the browser turns them into rates between polls, which is the
+same arithmetic a metrics collector does and the reason a restarted instance
+leaves a gap rather than a negative spike.
+
+Controls sit in one row: live or paused, poll interval, time window, and which
+metric to chart. Selecting an instance in the left rail removes it from the
+chart. Instances that stop answering stay listed and are marked as down —
+disappearing from a monitoring view is the one thing a dead instance must not do.
+
+**Colour identifies an instance, everywhere.** The slot is derived from the
+hostname and assigned by `/api/fleet`, so the same container is the same colour
+in the rail, on every chart, in the table and in the footer of the page it
+served — across reloads, without a registry. It is a slot in a fixed
+colourblind-validated palette rather than a generated hue, because two instances
+hashing to nearby hues would be indistinguishable as adjacent lines.
+
+Neither `/api/instance` nor `/api/fleet` records a visit, and both are excluded
+from request metrics. A console that showed up in its own measurements would be
+reporting mostly itself.
 
 ## Metrics
 

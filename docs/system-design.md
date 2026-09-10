@@ -22,7 +22,9 @@ be readable in one sitting.
 | `app/store.py` | 72 | The visit counter and its two backends | `redis` |
 | `app/limits.py` | 73 | Reading cgroup limits from the kernel | — |
 | `app/metrics.py` | 95 | Prometheus instrumentation and custom gauges | `prometheus_client` |
-| `app/identity.py` | 19 | Derives a stable colour from an instance's name | — |
+| `app/identity.py` | 45 | Derives a stable palette slot from an instance's name | — |
+| `app/fleet.py` | 78 | Resolves and polls the other instances | — |
+| `app/telemetry.py` | 55 | Reads this instance's counters out of the metrics registry | `prometheus_client` |
 | `wsgi.py` | 5 | The entry point gunicorn imports | `app` |
 | `gunicorn.conf.py` | 53 | Server settings, and the metrics directory lifecycle | — |
 
@@ -43,6 +45,10 @@ graph TD
     factory --> main["app/main.py<br/>routes"]
     main --> limits["app/limits.py<br/>cgroup reader"]
     main --> identity["app/identity.py<br/>instance colour"]
+    main --> fleetmod["app/fleet.py<br/>peer discovery"]
+    main --> telemetry["app/telemetry.py<br/>counter readout"]
+    fleetmod --> dns["container DNS"]
+    fleetmod -.->|"HTTP /api/instance"| peers["other instances"]
     main --> metrics
     store --> redis[(Redis)]
     limits --> cgroup["/sys/fs/cgroup"]
@@ -52,16 +58,19 @@ Dependencies point one way, inward from the entry point. `limits.py` and
 `identity.py` depend on nothing at all, which is why they are the easiest
 modules to test.
 
-### 1.3 One deliberate duplication
+### 1.3 Colour is assigned by the server
 
-`accent_hue()` exists twice: in `app/identity.py` and again in the page's
-script. The server needs it so the page is correctly tinted on first paint
-and without JavaScript; the browser needs it to colour bars for replicas it
-discovers, which the server never sees. Sharing one implementation would mean
-shipping a hue lookup in every response or an endpoint that exists only to
-hash a string. Four lines of arithmetic, duplicated knowingly and tested on
-the Python side, is the cheaper trade — but the two must stay in step, and a
-comment in each says so.
+An instance's colour identifies it in the console: in the fleet list, on every
+chart line, in the table, and in the footer of the page it served. The slot is
+derived from the hostname, because nothing knows a container's id until it
+exists and there is no registry to look it up in.
+
+Two decisions matter here. It selects a **slot in a fixed validated palette**
+rather than a raw hue: two instances hashing ten degrees apart would be
+indistinguishable as adjacent lines, which is exactly where the colour has to
+work. And `/api/fleet` **assigns the slots itself**, resolving collisions across
+the whole fleet, so the browser never reimplements the derivation and the two
+can never drift apart.
 
 ---
 

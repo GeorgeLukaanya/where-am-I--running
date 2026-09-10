@@ -13,516 +13,660 @@
     --ink-2: #4a5158;
     --ink-3: #6b7278;
     --rule: #c9cdc6;
-    --warn: #8a4b2a;
+    --grid: #d3d7d0;
+    --bad: #b03a2e;
 
-    /* Set from the container that served this page. */
-    --hue: 200;
-    --accent: oklch(0.52 0.15 var(--hue));
-    --accent-soft: oklch(0.88 0.06 var(--hue));
-    --accent-line: oklch(0.72 0.11 var(--hue));
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
 
     --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
             "DejaVu Sans Mono", monospace;
     --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #131618;
-      --panel: #1b1f22;
-      --sunk: #0e1113;
-      --ink: #e8eae6;
-      --ink-2: #9aa2a8;
-      --ink-3: #7d858b;
-      --rule: #2b3135;
-      --warn: #d99167;
-      --accent: oklch(0.74 0.14 var(--hue));
-      --accent-soft: oklch(0.32 0.08 var(--hue));
-      --accent-line: oklch(0.52 0.12 var(--hue));
+      --ground: #131618; --panel: #1b1f22; --sunk: #0e1113;
+      --ink: #e8eae6; --ink-2: #9aa2a8; --ink-3: #7d858b;
+      --rule: #2b3135; --grid: #262c30; --bad: #e66767;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     }
   }
 
   * { box-sizing: border-box; }
-
   body {
-    margin: 0;
-    padding: 28px 20px 64px;
-    background: var(--ground);
-    color: var(--ink);
-    font: 14px/1.5 var(--sans);
+    margin: 0; padding: 0 20px 56px;
+    background: var(--ground); color: var(--ink);
+    font: 13.5px/1.5 var(--sans);
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
   }
+  .wrap { max-width: 1180px; margin: 0 auto; }
 
-  .wrap { max-width: 860px; margin: 0 auto; }
-
-  /* --- shared type roles --- */
   .label {
-    font-family: var(--mono);
-    font-size: 10.5px;
-    font-weight: 500;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--ink-3);
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
   }
-  .value { font-family: var(--mono); font-size: 15px; color: var(--ink); }
+  .mono { font-family: var(--mono); }
 
-  /* --- masthead --- */
-  .masthead {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--rule);
-  }
-  .wordmark {
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    font-weight: 600;
-    color: var(--ink-2);
-  }
-  .controls { display: flex; gap: 8px; align-items: center; }
-
-  button {
-    font-family: var(--mono);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ink);
-    background: transparent;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    padding: 6px 11px;
-    cursor: pointer;
-    transition: border-color 120ms, background 120ms;
-  }
-  button:hover { border-color: var(--accent-line); }
-  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  button[aria-pressed="true"] {
-    border-color: var(--accent-line);
-    background: var(--accent-soft);
-  }
-  .pulse {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--accent);
-    margin-right: 7px;
-    flex: none;
-  }
-  button[aria-pressed="false"] .pulse { background: var(--ink-3); }
-  .watching .pulse { animation: breathe 1.9s ease-in-out infinite; }
-  @keyframes breathe { 50% { opacity: 0.25; } }
-
-  /* --- hero: the instance serving this page --- */
-  .hero { padding: 40px 0 34px; border-bottom: 1px solid var(--rule); }
-  .hero .label { display: block; margin-bottom: 14px; }
-  .instance-id {
-    font-family: var(--mono);
-    font-size: clamp(2.1rem, 9vw, 4.25rem);
-    font-weight: 600;
-    letter-spacing: -0.035em;
-    line-height: 1;
-    color: var(--accent);
-    word-break: break-all;
-    margin: 0;
-  }
-  .hero-meta {
-    display: flex; flex-wrap: wrap; gap: 10px 26px;
-    margin-top: 20px;
-  }
-  .hero-meta div { display: flex; align-items: baseline; gap: 9px; }
-  .hero-note {
-    margin: 22px 0 0;
-    max-width: 46ch;
-    color: var(--ink-2);
-    font-size: 13px;
-  }
-
-  /* --- routing ledger --- */
-  .ledger { padding: 30px 0; border-bottom: 1px solid var(--rule); }
-  .ledger-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 16px; flex-wrap: wrap; margin-bottom: 6px;
-  }
-  .ledger-note { color: var(--ink-2); font-size: 13px; margin: 0 0 18px; max-width: 54ch; }
-
-  .bars {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 132px;
-    padding: 10px;
-    background: var(--sunk);
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    overflow: hidden;
-  }
+  /* --- control bar --- */
   .bar {
-    flex: 1 1 0;
-    min-width: 3px;
-    min-height: 3px;
-    border-radius: 1px 1px 0 0;
-    background: oklch(0.62 0.14 var(--bar-hue, 200));
-    transition: opacity 140ms;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap;
+    padding: 16px 0 13px; border-bottom: 1px solid var(--rule);
   }
-  @media (prefers-color-scheme: dark) {
-    .bar { background: oklch(0.68 0.13 var(--bar-hue, 200)); }
+  .brand {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.18em;
+    text-transform: uppercase; font-weight: 600; color: var(--ink-2);
   }
-  .bar.is-failed { background: repeating-linear-gradient(
-      45deg, var(--warn), var(--warn) 2px, transparent 2px, transparent 4px); }
-  .bar.is-dimmed { opacity: 0.16; }
-  .bars.is-empty { align-items: center; justify-content: center; }
-  .bars-empty {
-    font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em;
+  .brand b { color: var(--ink); font-weight: 600; }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  button, select {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+    color: var(--ink); background: var(--panel);
+    border: 1px solid var(--rule); border-radius: 3px;
+    padding: 6px 10px; cursor: pointer;
+  }
+  button { text-transform: uppercase; }
+  button:hover, select:hover { border-color: var(--ink-3); }
+  button:focus-visible, select:focus-visible,
+  .inst:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  #live .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--s6); margin-right: 7px; vertical-align: middle;
+  }
+  #live[aria-pressed="false"] .dot { background: var(--ink-3); }
+  #live[aria-pressed="true"] .dot { animation: breathe 2s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: 0.2; } }
+
+  /* --- summary tiles --- */
+  .tiles {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 1px; background: var(--rule);
+    border: 1px solid var(--rule); border-top: 0;
+  }
+  .tile { background: var(--panel); padding: 13px 15px; }
+  .tile .label { display: block; margin-bottom: 5px; }
+  .tile .n { font-family: var(--mono); font-size: 21px; letter-spacing: -0.02em; }
+  .tile .sub { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .tile .n.warn { color: var(--bad); }
+
+  /* --- console body --- */
+  .console { display: grid; grid-template-columns: 232px 1fr; gap: 1px;
+             background: var(--rule); border: 1px solid var(--rule); border-top: 0; }
+  .rail, .plot { background: var(--panel); }
+  .rail { padding: 14px 0 10px; }
+  .rail-head { display: flex; justify-content: space-between; padding: 0 15px 10px; }
+
+  .inst {
+    display: grid; grid-template-columns: 12px 1fr auto; align-items: center;
+    gap: 9px; width: 100%; text-align: left;
+    background: none; border: 0; border-radius: 0;
+    padding: 7px 15px; font-size: 12px; text-transform: none; letter-spacing: 0;
+  }
+  .inst:hover { background: var(--sunk); }
+  .inst .sw { width: 10px; height: 10px; border-radius: 2px; background: var(--c); }
+  .inst .id { font-family: var(--mono); font-size: 12px; }
+  .inst .rt { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+  .inst[aria-pressed="false"] { background: none; color: var(--ink-3); }
+  .inst[aria-pressed="false"] .sw { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+  .inst.down .id { color: var(--bad); text-decoration: line-through; }
+  .inst .me {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--ink-3);
   }
-  .scale {
-    display: flex; justify-content: space-between;
-    margin-top: 7px; font-family: var(--mono); font-size: 10.5px;
-    color: var(--ink-3);
-  }
 
-  /* --- roster --- */
-  .roster { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 20px; }
-  .chip {
-    display: flex; align-items: center; gap: 8px;
-    font-family: var(--mono); font-size: 12px;
-    padding: 5px 10px 5px 7px;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    background: var(--panel);
-    cursor: pointer;
-    transition: border-color 120ms, opacity 120ms;
+  /* --- plot --- */
+  .plot { padding: 14px 16px 16px; min-width: 0; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+  .plot-note { color: var(--ink-3); font-family: var(--mono); font-size: 10.5px; margin: 8px 0 10px; }
+  .canvas { position: relative; }
+  svg.chart { display: block; width: 100%; height: 250px; overflow: visible; }
+  .gridline { stroke: var(--grid); stroke-width: 1; }
+  .axis { font-family: var(--mono); font-size: 9.5px; fill: var(--ink-3); }
+  .series { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .endlabel { font-family: var(--mono); font-size: 10px; fill: var(--ink-2); }
+  .crosshair { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 3 3; }
+  .empty {
+    display: grid; place-items: center; height: 250px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3); text-align: center;
   }
-  .chip:hover { border-color: var(--accent-line); }
-  .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .chip.is-muted { opacity: 0.4; }
-  .chip .swatch {
-    width: 10px; height: 10px; border-radius: 2px;
-    background: oklch(0.62 0.14 var(--chip-hue, 200));
-    flex: none;
+  .tip {
+    position: absolute; pointer-events: none; z-index: 5;
+    background: var(--panel); border: 1px solid var(--rule); border-radius: 3px;
+    padding: 8px 10px; font-family: var(--mono); font-size: 11px;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.12); min-width: 150px;
   }
-  .chip .count { color: var(--ink-3); }
-  .chip .you {
-    font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--accent); border-left: 1px solid var(--rule); padding-left: 8px;
-  }
+  .tip .when { color: var(--ink-3); margin-bottom: 5px; }
+  .tip .row { display: flex; align-items: center; gap: 7px; justify-content: space-between; }
+  .tip .row .k { display: flex; align-items: center; gap: 6px; }
+  .tip .row .sw { width: 8px; height: 8px; border-radius: 2px; background: var(--c); }
 
-  /* --- facts --- */
-  .facts { padding: 30px 0 0; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--rule);
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-top: 16px;
-  }
-  .cell { background: var(--panel); padding: 15px 16px; }
-  .cell .label { display: block; margin-bottom: 7px; }
-  .cell .value { font-size: 16px; }
-  .cell .value.is-muted { color: var(--ink-3); }
+  /* --- table --- */
+  .detail { margin-top: 26px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--rule); }
+  th { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em;
+       text-transform: uppercase; color: var(--ink-3); font-weight: 500; }
+  td { font-family: var(--mono); }
+  td.num { text-align: right; }
+  tr.down td { color: var(--ink-3); }
+  .tag { display: inline-flex; align-items: center; gap: 7px; }
+  .tag .sw { width: 9px; height: 9px; border-radius: 2px; background: var(--c); }
 
-  footer {
-    margin-top: 26px;
-    color: var(--ink-3);
-    font-size: 12px;
-    display: flex; gap: 8px 18px; flex-wrap: wrap;
-  }
+  footer { margin-top: 22px; color: var(--ink-3); font-size: 11.5px;
+           display: flex; gap: 8px 18px; flex-wrap: wrap; font-family: var(--mono); }
   footer a { color: var(--ink-2); }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden;
+             clip: rect(0 0 0 0); white-space: nowrap; }
 
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-  }
-
-  @media (max-width: 620px) {
-    .grid { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 860px) {
+    .console { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: repeat(2, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
   }
 </style>
 </head>
-<body style="--hue: {{ hue }}">
+<body data-self-slot="{{ slot }}">
 <div class="wrap">
 
-  <header class="masthead">
-    <div class="wordmark">Where am I running</div>
+  <div class="bar">
+    <div class="brand">Where am I running · <b>fleet</b></div>
     <div class="controls">
-      <button id="watch" type="button" aria-pressed="true">
-        <span class="pulse"></span>Watch routing
-      </button>
+      <button id="live" type="button" aria-pressed="true"><span class="dot"></span>Live</button>
+      <label class="sr-only" for="every">Poll interval</label>
+      <select id="every">
+        <option value="1000">every 1s</option>
+        <option value="2000" selected>every 2s</option>
+        <option value="5000">every 5s</option>
+        <option value="10000">every 10s</option>
+      </select>
+      <label class="sr-only" for="window">Time window</label>
+      <select id="window">
+        <option value="120000">last 2 min</option>
+        <option value="300000" selected>last 5 min</option>
+        <option value="900000">last 15 min</option>
+      </select>
       <button id="burst" type="button">Send 20 requests</button>
     </div>
-  </header>
+  </div>
 
-  <section class="hero">
-    <span class="label">Container that served this page</span>
-    <h1 class="instance-id">{{ info.hostname }}</h1>
-    <div class="hero-meta">
-      <div><span class="label">Env</span><span class="value">{{ info.environment }}</span></div>
-      <div><span class="label">Commit</span><span class="value">{{ info.git_sha }}</span></div>
-      <div><span class="label">Image</span><span class="value">{{ info.image_tag }}</span></div>
-    </div>
-    <p class="hero-note">
-      The colour of this page is derived from that ID. Reload — if another
-      container answers, the page changes with it.
-    </p>
-  </section>
+  <div class="tiles">
+    <div class="tile"><span class="label">Instances</span>
+      <div class="n" id="t-instances">—</div><div class="sub" id="t-source">discovering</div></div>
+    <div class="tile"><span class="label">Requests/sec</span>
+      <div class="n" id="t-rps">—</div><div class="sub">fleet total</div></div>
+    <div class="tile"><span class="label">Latency</span>
+      <div class="n" id="t-lat">—</div><div class="sub">mean, this window</div></div>
+    <div class="tile"><span class="label">Errors</span>
+      <div class="n" id="t-err">—</div><div class="sub">5xx since start</div></div>
+    <div class="tile"><span class="label">Visits</span>
+      <div class="n" id="t-visits">—</div><div class="sub" id="t-store">shared counter</div></div>
+  </div>
 
-  <section class="ledger">
-    <div class="ledger-head">
-      <span class="label">Routing</span>
-      <span class="label" id="tally">no requests yet</span>
+  <div class="console">
+    <div class="rail">
+      <div class="rail-head">
+        <span class="label">Instances</span>
+        <span class="label" id="rail-count"></span>
+      </div>
+      <div id="rail"></div>
     </div>
-    <p class="ledger-note">
-      One bar per request. Height is how long it took, colour is which container
-      answered. Select a container below to pick it out.
-    </p>
-    <div class="bars is-empty" id="bars">
-      <span class="bars-empty">Waiting for the first response</span>
-    </div>
-    <div class="scale">
-      <span id="scale-window">window · 48 requests</span>
-      <span id="scale-max">&nbsp;</span>
-    </div>
-    <div class="roster" id="roster"></div>
-    <p class="sr-only" id="announce" aria-live="polite"></p>
-  </section>
 
-  <section class="facts">
-    <span class="label">Most recent response</span>
-    <div class="grid">
-      <div class="cell">
-        <span class="label">Uptime</span>
-        <span class="value" id="f-uptime">{{ info.uptime_seconds }}s</span>
+    <div class="plot">
+      <div class="tabs" role="group" aria-label="Metric">
+        <button type="button" class="metric" data-metric="rps" aria-pressed="true">Requests/sec</button>
+        <button type="button" class="metric" data-metric="latency" aria-pressed="false">Latency</button>
+        <button type="button" class="metric" data-metric="errors" aria-pressed="false">Errors/sec</button>
+        <button type="button" class="metric" data-metric="uptime" aria-pressed="false">Uptime</button>
       </div>
-      <div class="cell">
-        <span class="label">Memory limit</span>
-        <span class="value" id="f-memory">{{ info.memory_limit }}</span>
-      </div>
-      <div class="cell">
-        <span class="label">CPU limit</span>
-        <span class="value" id="f-cpu">{{ info.cpu_limit }}</span>
-      </div>
-      <div class="cell">
-        <span class="label">Visits</span>
-        <span class="value" id="f-visits">
-          {{ info.visits if info.visits is not none else "&mdash;" | safe }}
-        </span>
-      </div>
-      <div class="cell">
-        <span class="label">Counted in</span>
-        <span class="value" id="f-backend">{{ info.counter_backend }}</span>
-      </div>
-      <div class="cell">
-        <span class="label">Python</span>
-        <span class="value">{{ info.python_version }}</span>
+      <p class="plot-note" id="plot-note"></p>
+      <div class="canvas" id="canvas">
+        <div class="empty" id="empty">Collecting. The first points appear after two polls.</div>
       </div>
     </div>
-  </section>
+  </div>
+
+  <div class="detail">
+    <span class="label">Fleet detail</span>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Instance</th><th>Address</th><th>Env</th><th>Commit</th>
+          <th class="num">Uptime</th><th class="num">Memory</th><th class="num">CPU</th>
+          <th class="num">Req/s</th><th class="num">Latency</th><th>State</th>
+        </tr></thead>
+        <tbody id="rows"><tr><td colspan="10" style="color:var(--ink-3)">Waiting for the first poll.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 
   <footer>
-    <span>JSON at <a href="/api/info">/api/info</a></span>
+    <span>Fleet at <a href="/api/fleet">/api/fleet</a></span>
+    <span>This instance at <a href="/api/instance">/api/instance</a></span>
     <span>Metrics at <a href="/metrics">/metrics</a></span>
-    <span>Health at <a href="/health/ready">/health/ready</a></span>
+    <span id="served" style="--c: var(--s{{ slot + 1 }})">
+      <span class="sw" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--c);vertical-align:middle;margin-right:6px"></span>Served by {{ info.hostname }} · {{ info.git_sha }} · {{ info.environment }}
+    </span>
   </footer>
-
+  <p class="sr-only" aria-live="polite" id="announce"></p>
 </div>
 
 <script>
 (function () {
   "use strict";
 
-  var WINDOW = 48;
-  var INTERVAL = 2000;
-  var SELF = "{{ info.hostname }}";
-
-  var el = {
-    bars: document.getElementById("bars"),
-    roster: document.getElementById("roster"),
-    tally: document.getElementById("tally"),
-    scaleMax: document.getElementById("scale-max"),
-    announce: document.getElementById("announce"),
-    watch: document.getElementById("watch"),
-    burst: document.getElementById("burst"),
-    uptime: document.getElementById("f-uptime"),
-    memory: document.getElementById("f-memory"),
-    cpu: document.getElementById("f-cpu"),
-    visits: document.getElementById("f-visits"),
-    backend: document.getElementById("f-backend")
+  var SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+  var METRICS = {
+    rps:     { title: "Requests per second", unit: "/s",  kind: "rate",  dp: 2 },
+    latency: { title: "Mean request latency", unit: " ms", kind: "mean", dp: 1 },
+    errors:  { title: "Server errors per second", unit: "/s", kind: "rate", dp: 3 },
+    uptime:  { title: "Uptime", unit: " s", kind: "gauge", dp: 0 }
   };
 
-  var entries = [];
-  var seen = new Map();
-  var focused = null;
-  var timer = null;
-  var inFlight = false;
+  var el = function (id) { return document.getElementById(id); };
+  var canvas = el("canvas"), rail = el("rail"), rows = el("rows");
 
-  // Identical to accent_hue() in app/identity.py -- keep the two in step.
-  function hueFor(name) {
-    var value = 0;
-    for (var i = 0; i < name.length; i++) {
-      value = (value * 31 + name.charCodeAt(i)) % 360000;
-    }
-    return value % 360;
-  }
+  var state = {
+    metric: "rps",
+    every: 2000,
+    window: 300000,
+    live: true,
+    hidden: {},
+    samples: [],       // { t, byHost: { host: report } }
+    fleet: {},         // host -> latest report
+    timer: null,
+    busy: false
+  };
 
-  function record(hostname, ms, data) {
-    entries.push({ host: hostname, ms: ms, at: Date.now() });
-    if (entries.length > WINDOW) entries.shift();
+  function colour(slot) { return "var(" + SERIES[(slot || 0) % SERIES.length] + ")"; }
+  function shortId(host) { return host ? host.slice(0, 10) : "unknown"; }
 
-    if (hostname) {
-      var known = seen.get(hostname);
-      if (known) {
-        known.count += 1;
-      } else {
-        seen.set(hostname, { count: 1, hue: hueFor(hostname) });
-        renderRoster();
-      }
-      if (data) updateFacts(data);
-    }
-    renderBars();
-    renderTally();
-  }
+  // --- polling -------------------------------------------------------------
 
-  function renderBars() {
-    if (!entries.length) return;
-    el.bars.classList.remove("is-empty");
-
-    var slowest = entries.reduce(function (top, e) {
-      return Math.max(top, e.ms);
-    }, 12);
-
-    el.bars.replaceChildren.apply(el.bars, entries.map(function (e) {
-      var bar = document.createElement("div");
-      bar.className = "bar";
-      bar.style.height = Math.max(3, (e.ms / slowest) * 100) + "%";
-      if (e.host) {
-        bar.style.setProperty("--bar-hue", String(seen.get(e.host).hue));
-        bar.title = e.host + " · " + e.ms.toFixed(0) + " ms";
-        if (focused && e.host !== focused) bar.classList.add("is-dimmed");
-      } else {
-        bar.classList.add("is-failed");
-        bar.title = "no response";
-      }
-      return bar;
-    }));
-
-    el.scaleMax.textContent = "slowest " + slowest.toFixed(0) + " ms";
-  }
-
-  function renderRoster() {
-    el.roster.replaceChildren.apply(el.roster, Array.from(seen.entries()).map(
-      function (pair) {
-        var host = pair[0];
-        var info = pair[1];
-        var chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "chip";
-        chip.style.setProperty("--chip-hue", String(info.hue));
-        chip.setAttribute("aria-pressed", String(focused === host));
-        if (focused && focused !== host) chip.classList.add("is-muted");
-
-        var swatch = document.createElement("span");
-        swatch.className = "swatch";
-        var name = document.createElement("span");
-        name.textContent = host;
-        var count = document.createElement("span");
-        count.className = "count";
-        count.textContent = info.count;
-        chip.append(swatch, name, count);
-
-        if (host === SELF) {
-          var you = document.createElement("span");
-          you.className = "you";
-          you.textContent = "this page";
-          chip.append(you);
-        }
-
-        chip.addEventListener("click", function () {
-          focused = focused === host ? null : host;
-          renderRoster();
-          renderBars();
-        });
-        return chip;
-      }
-    ));
-  }
-
-  function renderTally() {
-    var containers = seen.size;
-    el.tally.textContent = entries.length + " requests · " + containers +
-      (containers === 1 ? " container" : " containers");
-    el.announce.textContent = el.tally.textContent;
-  }
-
-  function updateFacts(d) {
-    el.uptime.textContent = d.uptime_seconds + "s";
-    el.memory.textContent = d.memory_limit;
-    el.cpu.textContent = d.cpu_limit;
-    el.backend.textContent = d.counter_backend;
-    if (d.visits === null) {
-      el.visits.textContent = "—";
-      el.visits.classList.add("is-muted");
-      el.visits.title = "Unknown while the counter is unreachable";
-    } else {
-      el.visits.textContent = d.visits;
-      el.visits.classList.remove("is-muted");
-      el.visits.removeAttribute("title");
-    }
-  }
-
-  function probe() {
-    if (inFlight) return Promise.resolve();
-    inFlight = true;
-    var started = performance.now();
-    return fetch("/api/info", { cache: "no-store" })
+  function poll() {
+    if (state.busy) return Promise.resolve();
+    state.busy = true;
+    return fetch("/api/fleet", { cache: "no-store" })
       .then(function (r) { return r.json(); })
-      .then(function (d) { record(d.hostname, performance.now() - started, d); })
-      .catch(function () { record(null, performance.now() - started, null); })
-      .finally(function () { inFlight = false; });
+      .then(absorb)
+      .catch(function () { /* a failed poll simply adds no sample */ })
+      .finally(function () { state.busy = false; });
   }
 
-  function watching() { return el.watch.getAttribute("aria-pressed") === "true"; }
+  function absorb(payload) {
+    var byHost = {};
+    payload.instances.forEach(function (report) {
+      var key = report.hostname || report.address;
+      report.key = key;
+      byHost[key] = report;
+      state.fleet[key] = report;
+    });
+
+    state.samples.push({ t: Date.now(), byHost: byHost });
+    var cutoff = Date.now() - state.window - state.every * 2;
+    while (state.samples.length && state.samples[0].t < cutoff) state.samples.shift();
+
+    el("t-source").textContent = payload.source;
+    render(payload);
+  }
+
+  // --- deriving series -----------------------------------------------------
+  //
+  // Counters are totals, so a rate needs two samples. A total that goes
+  // backwards means the instance restarted; that gap is left empty rather than
+  // drawn as a negative spike.
+
+  function valueAt(i, host, metric) {
+    var now = state.samples[i], prev = state.samples[i - 1];
+    var a = now && now.byHost[host];
+    if (!a || !a.ok) return null;
+
+    if (metric === "uptime") return a.uptime_seconds;
+
+    var b = prev && prev.byHost[host];
+    if (!b || !b.ok || !a.counters || !b.counters) return null;
+    var dt = (now.t - prev.t) / 1000;
+    if (dt <= 0) return null;
+
+    if (metric === "rps") {
+      var d = a.counters.requests_total - b.counters.requests_total;
+      return d < 0 ? null : d / dt;
+    }
+    if (metric === "errors") {
+      var e = a.counters.errors_total - b.counters.errors_total;
+      return e < 0 ? null : e / dt;
+    }
+    var ds = a.counters.request_seconds_sum - b.counters.request_seconds_sum;
+    var dc = a.counters.request_seconds_count - b.counters.request_seconds_count;
+    if (dc <= 0 || ds < 0) return null;
+    return (ds / dc) * 1000;
+  }
+
+  function visibleHosts() {
+    return Object.keys(state.fleet).filter(function (h) { return !state.hidden[h]; }).sort();
+  }
+
+  // --- rendering -----------------------------------------------------------
+
+  function render(payload) {
+    renderTiles(payload);
+    renderRail();
+    renderTable();
+    renderChart();
+  }
+
+  function fmt(v, dp) { return v === null || v === undefined ? "—" : v.toFixed(dp); }
+
+  function renderTiles(p) {
+    el("t-instances").textContent = p.reachable + " / " + p.discovered;
+    var tInst = el("t-instances");
+    tInst.classList.toggle("warn", p.reachable < p.discovered);
+
+    var last = state.samples.length - 1;
+    var rps = 0, sum = 0, count = 0, errs = 0, visits = null, store = "shared counter";
+    Object.keys(state.fleet).forEach(function (h) {
+      var v = valueAt(last, h, "rps");
+      if (v !== null) rps += v;
+      var r = state.fleet[h];
+      if (r.ok && r.counters) {
+        sum += r.counters.request_seconds_sum;
+        count += r.counters.request_seconds_count;
+        errs += r.counters.errors_total;
+      }
+      if (r.ok && r.visits !== null && r.visits !== undefined) visits = r.visits;
+      if (r.ok && r.counter_backend) store = r.counter_backend;
+    });
+
+    el("t-rps").textContent = state.samples.length < 2 ? "—" : rps.toFixed(2);
+    el("t-lat").textContent = count ? (sum / count * 1000).toFixed(1) + " ms" : "—";
+    var errEl = el("t-err");
+    errEl.textContent = errs.toFixed(0);
+    errEl.classList.toggle("warn", errs > 0);
+    el("t-visits").textContent = visits === null ? "—" : visits;
+    el("t-store").textContent = store;
+    el("announce").textContent = p.reachable + " of " + p.discovered + " instances answering";
+  }
+
+  function renderRail() {
+    var hosts = Object.keys(state.fleet).sort();
+    el("rail-count").textContent = hosts.length;
+    rail.replaceChildren.apply(rail, hosts.map(function (host) {
+      var r = state.fleet[host];
+      var on = !state.hidden[host];
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "inst" + (r.ok ? "" : " down");
+      b.setAttribute("aria-pressed", String(on));
+      b.style.setProperty("--c", colour(r.slot));
+
+      var sw = document.createElement("span"); sw.className = "sw";
+      var id = document.createElement("span"); id.className = "id"; id.textContent = shortId(host);
+      var rt = document.createElement("span"); rt.className = "rt";
+      if (!r.ok) { rt.textContent = "down"; }
+      else if (r.self) { rt.className = "me"; rt.textContent = "this page"; }
+      else { rt.textContent = fmt(valueAt(state.samples.length - 1, host, "rps"), 1); }
+
+      b.append(sw, id, rt);
+      b.addEventListener("click", function () {
+        state.hidden[host] = on;
+        renderRail(); renderChart();
+      });
+      return b;
+    }));
+  }
+
+  function renderTable() {
+    var hosts = Object.keys(state.fleet).sort();
+    if (!hosts.length) return;
+    var last = state.samples.length - 1;
+    rows.replaceChildren.apply(rows, hosts.map(function (host) {
+      var r = state.fleet[host];
+      var tr = document.createElement("tr");
+      if (!r.ok) tr.className = "down";
+      var cells = [
+        ["tag", shortId(host), r.slot],
+        [null, r.address],
+        [null, r.ok ? r.environment : "—"],
+        [null, r.ok ? r.git_sha : "—"],
+        ["num", r.ok ? Math.round(r.uptime_seconds) + "s" : "—"],
+        ["num", r.ok ? r.memory_limit : "—"],
+        ["num", r.ok ? r.cpu_limit : "—"],
+        ["num", fmt(valueAt(last, host, "rps"), 2)],
+        ["num", r.ok ? fmt(valueAt(last, host, "latency"), 1) : "—"],
+        [null, r.ok ? "answering" : "not answering"]
+      ];
+      cells.forEach(function (c) {
+        var td = document.createElement("td");
+        if (c[0] === "num") td.className = "num";
+        if (c[0] === "tag") {
+          td.innerHTML = "";
+          var wrap = document.createElement("span");
+          wrap.className = "tag";
+          wrap.style.setProperty("--c", colour(c[2]));
+          var sw = document.createElement("span"); sw.className = "sw";
+          var t = document.createElement("span"); t.textContent = c[1];
+          wrap.append(sw, t);
+          td.append(wrap);
+        } else {
+          td.textContent = c[1];
+        }
+        tr.append(td);
+      });
+      return tr;
+    }));
+  }
+
+  var SVG = "http://www.w3.org/2000/svg";
+  function node(name, attrs) {
+    var n = document.createElementNS(SVG, name);
+    Object.keys(attrs || {}).forEach(function (k) { n.setAttribute(k, attrs[k]); });
+    return n;
+  }
+
+  function renderChart() {
+    var m = METRICS[state.metric];
+    var hosts = visibleHosts();
+    var pad = { l: 46, r: 54, t: 10, b: 22 };
+    var w = canvas.clientWidth || 700, h = 250;
+
+    var first = m.kind === "gauge" ? 0 : 1;
+    var points = {};
+    var peak = 0;
+    hosts.forEach(function (host) {
+      var line = [];
+      for (var i = first; i < state.samples.length; i++) {
+        var v = valueAt(i, host, state.metric);
+        line.push({ t: state.samples[i].t, v: v });
+        if (v !== null && v > peak) peak = v;
+      }
+      points[host] = line;
+    });
+
+    var drawable = hosts.some(function (h) {
+      return points[h].some(function (p) { return p.v !== null; });
+    });
+
+    el("plot-note").textContent = m.title + " · " + hosts.length +
+      (hosts.length === 1 ? " instance" : " instances") +
+      (m.kind === "rate" ? " · rate between polls" : "");
+
+    if (!drawable) {
+      canvas.replaceChildren(el("empty") || document.createElement("div"));
+      var e = canvas.firstElementChild;
+      e.className = "empty"; e.id = "empty";
+      e.textContent = hosts.length
+        ? "Collecting. The first points appear after two polls."
+        : "No instances selected. Choose one on the left.";
+      return;
+    }
+
+    var top = niceCeiling(peak);
+    var now = Date.now(), from = now - state.window;
+    var x = function (t) { return pad.l + (t - from) / (now - from) * (w - pad.l - pad.r); };
+    var y = function (v) { return pad.t + (1 - v / top) * (h - pad.t - pad.b); };
+
+    var svg = node("svg", { class: "chart", viewBox: "0 0 " + w + " " + h,
+                            role: "img", "aria-label": m.title });
+
+    for (var g = 0; g <= 3; g++) {
+      var val = top * (1 - g / 3), yy = y(val);
+      svg.append(node("line", { class: "gridline", x1: pad.l, x2: w - pad.r, y1: yy, y2: yy }));
+      var lab = node("text", { class: "axis", x: pad.l - 8, y: yy + 3, "text-anchor": "end" });
+      lab.textContent = trim(val, m.dp);
+      svg.append(lab);
+    }
+    [0, 0.5, 1].forEach(function (f) {
+      var t = from + (now - from) * f;
+      var lab = node("text", { class: "axis", x: x(t), y: h - 6,
+                               "text-anchor": f === 0 ? "start" : f === 1 ? "end" : "middle" });
+      lab.textContent = f === 1 ? "now" : "-" + Math.round((now - t) / 60000 * 10) / 10 + "m";
+      svg.append(lab);
+    });
+
+    hosts.forEach(function (host) {
+      var segs = [], cur = [];
+      points[host].forEach(function (p) {
+        if (p.v === null) { if (cur.length) segs.push(cur); cur = []; }
+        else cur.push(x(p.t).toFixed(1) + "," + y(p.v).toFixed(1));
+      });
+      if (cur.length) segs.push(cur);
+      segs.forEach(function (seg) {
+        if (seg.length < 2) return;
+        svg.append(node("path", { class: "series", d: "M" + seg.join("L"),
+                                  stroke: colour(state.fleet[host].slot) }));
+      });
+      if (hosts.length <= 4) {
+        var lastPt = points[host].filter(function (p) { return p.v !== null; }).pop();
+        if (lastPt) {
+          var t = node("text", { class: "endlabel", x: w - pad.r + 7, y: y(lastPt.v) + 3 });
+          t.textContent = shortId(host).slice(0, 6);
+          svg.append(t);
+        }
+      }
+    });
+
+    var hair = node("line", { class: "crosshair", y1: pad.t, y2: h - pad.b, x1: -10, x2: -10 });
+    svg.append(hair);
+
+    canvas.replaceChildren(svg);
+    attachHover(svg, hair, x, hosts, pad, w);
+  }
+
+  function attachHover(svg, hair, x, hosts, pad, w) {
+    var tip = document.createElement("div");
+    tip.className = "tip"; tip.hidden = true;
+    canvas.append(tip);
+
+    svg.addEventListener("mousemove", function (ev) {
+      var box = svg.getBoundingClientRect();
+      var px = (ev.clientX - box.left) * (w / box.width);
+      var best = -1, bestD = Infinity;
+      for (var i = 0; i < state.samples.length; i++) {
+        var d = Math.abs(x(state.samples[i].t) - px);
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      if (best < 1) { tip.hidden = true; hair.setAttribute("x1", -10); hair.setAttribute("x2", -10); return; }
+
+      var hx = x(state.samples[best].t);
+      hair.setAttribute("x1", hx); hair.setAttribute("x2", hx);
+
+      var m = METRICS[state.metric];
+      var when = new Date(state.samples[best].t);
+      tip.replaceChildren();
+      var head = document.createElement("div");
+      head.className = "when";
+      head.textContent = when.toTimeString().slice(0, 8);
+      tip.append(head);
+      hosts.forEach(function (host) {
+        var v = valueAt(best, host, state.metric);
+        var row = document.createElement("div"); row.className = "row";
+        var k = document.createElement("span"); k.className = "k";
+        k.style.setProperty("--c", colour(state.fleet[host].slot));
+        var sw = document.createElement("span"); sw.className = "sw";
+        var nm = document.createElement("span"); nm.textContent = shortId(host).slice(0, 8);
+        k.append(sw, nm);
+        var val = document.createElement("span");
+        val.textContent = v === null ? "—" : trim(v, m.dp) + m.unit;
+        row.append(k, val);
+        tip.append(row);
+      });
+      tip.hidden = false;
+      var left = Math.min(Math.max(0, (hx / w) * svg.getBoundingClientRect().width + 12),
+                          canvas.clientWidth - tip.offsetWidth - 4);
+      tip.style.left = left + "px";
+      tip.style.top = "8px";
+    });
+
+    svg.addEventListener("mouseleave", function () {
+      tip.hidden = true;
+      hair.setAttribute("x1", -10); hair.setAttribute("x2", -10);
+    });
+  }
+
+  function trim(v, dp) { return Number(v.toFixed(dp)).toString(); }
+
+  function niceCeiling(peak) {
+    if (peak <= 0) return 1;
+    var mag = Math.pow(10, Math.floor(Math.log10(peak)));
+    var n = peak / mag;
+    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * mag;
+  }
+
+  // --- controls ------------------------------------------------------------
 
   function schedule() {
-    clearInterval(timer);
-    el.watch.classList.toggle("watching", watching());
-    if (watching()) timer = setInterval(probe, INTERVAL);
+    clearInterval(state.timer);
+    if (state.live) state.timer = setInterval(poll, state.every);
   }
 
-  el.watch.addEventListener("click", function () {
-    el.watch.setAttribute("aria-pressed", String(!watching()));
+  el("live").addEventListener("click", function () {
+    state.live = !state.live;
+    this.setAttribute("aria-pressed", String(state.live));
+    this.lastChild.textContent = state.live ? "Live" : "Paused";
     schedule();
-    if (watching()) probe();
+    if (state.live) poll();
   });
 
-  el.burst.addEventListener("click", function () {
-    el.burst.disabled = true;
+  el("every").addEventListener("change", function () {
+    state.every = Number(this.value); schedule();
+  });
+
+  el("window").addEventListener("change", function () {
+    state.window = Number(this.value); renderChart();
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".metric"), function (b) {
+    b.addEventListener("click", function () {
+      state.metric = b.dataset.metric;
+      Array.prototype.forEach.call(document.querySelectorAll(".metric"), function (o) {
+        o.setAttribute("aria-pressed", String(o === b));
+      });
+      renderChart();
+    });
+  });
+
+  el("burst").addEventListener("click", function () {
+    var b = this; b.disabled = true;
     var sent = 0;
     var run = setInterval(function () {
-      probe();
-      if (++sent >= 20) {
-        clearInterval(run);
-        el.burst.disabled = false;
-      }
-    }, 90);
+      fetch("/api/info", { cache: "no-store" }).catch(function () {});
+      if (++sent >= 20) { clearInterval(run); b.disabled = false; }
+    }, 80);
   });
 
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) clearInterval(timer);
-    else schedule();
+    if (document.hidden) clearInterval(state.timer); else schedule();
   });
+  window.addEventListener("resize", function () { renderChart(); });
 
   schedule();
-  probe();
+  poll();
 })();
 </script>
 </body>

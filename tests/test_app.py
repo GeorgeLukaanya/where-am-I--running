@@ -6,9 +6,11 @@ import time
 import pytest
 
 from app import create_app
-from app.identity import accent_hue
+from app.fleet import discover, poll
+from app.identity import PALETTE_SIZE, accent_slot, assign_slots
 from app.limits import read_limits
 from app.store import InMemoryCounter, RedisCounter, make_counter
+from app.telemetry import read_counters
 
 
 @pytest.fixture
@@ -330,18 +332,138 @@ def test_readiness_fails_once_shutdown_has_begun(client, tmp_path):
 # --- instance identity colour ------------------------------------------------
 
 
-def test_accent_hue_is_stable_for_a_hostname():
-    assert accent_hue("3731a4862174") == accent_hue("3731a4862174")
+def test_accent_slot_is_stable_for_a_hostname():
+    assert accent_slot("3731a4862174") == accent_slot("3731a4862174")
 
 
-def test_accent_hue_is_always_a_valid_hue():
+def test_accent_slot_is_always_inside_the_palette():
     for host in ("3731a4862174", "feacdc02a322", "localhost", "", "a"):
-        assert 0 <= accent_hue(host) < 360
+        assert 0 <= accent_slot(host) < PALETTE_SIZE
 
 
-def test_different_instances_generally_differ():
-    hosts = ["3731a4862174", "feacdc02a322", "42da6c39007b", "c51650a870c2"]
+def test_every_instance_in_a_fleet_gets_a_distinct_colour():
+    fleet = ["3731a4862174", "feacdc02a322", "42da6c39007b", "c51650a870c2", "b140b9987407"]
 
-    # Not a guarantee -- 360 hues will collide eventually -- but a spread this
-    # small colliding would mean the derivation is not using the whole name.
-    assert len({accent_hue(h) for h in hosts}) == len(hosts)
+    slots = assign_slots(fleet)
+
+    # Two identically coloured lines would be unreadable, so collisions must be
+    # resolved rather than tolerated.
+    assert len(set(slots.values())) == len(fleet)
+
+
+def test_slot_assignment_does_not_depend_on_arrival_order():
+    fleet = ["aaa", "bbb", "ccc", "ddd"]
+
+    assert assign_slots(fleet) == assign_slots(reversed(fleet))
+
+
+def test_a_fleet_larger_than_the_palette_still_returns_a_slot_for_each():
+    fleet = [f"instance{n:02d}" for n in range(12)]
+
+    slots = assign_slots(fleet)
+
+    assert len(slots) == 12
+    assert all(0 <= slot < PALETTE_SIZE for slot in slots.values())
+
+
+# --- peer discovery ----------------------------------------------------------
+#
+# discover() and poll() take their resolver and fetcher as arguments so these
+# tests need neither DNS nor a network.
+
+
+def fake_resolver(records):
+    return lambda host, port, **kw: [(None, None, None, "", (ip, port)) for ip in records]
+
+
+def test_no_peer_service_means_a_fleet_of_one():
+    assert discover(service="", port=8000) == []
+
+
+def test_discovery_returns_every_address_behind_the_name():
+    resolve = fake_resolver(["10.0.0.3", "10.0.0.1", "10.0.0.2"])
+
+    # Sorted, so the fleet list does not reshuffle between polls.
+    assert discover("web", 8000, resolver=resolve) == ["10.0.0.1", "10.0.0.2", "10.0.0.3"]
+
+
+def test_discovery_collapses_duplicate_records():
+    resolve = fake_resolver(["10.0.0.1", "10.0.0.1"])
+
+    assert discover("web", 8000, resolver=resolve) == ["10.0.0.1"]
+
+
+def test_discovery_survives_a_name_that_does_not_resolve():
+    def broken(host, port, **kw):
+        raise OSError("Name or service not known")
+
+    assert discover("web", 8000, resolver=broken) == []
+
+
+def test_poll_reports_reachable_and_unreachable_peers():
+    def fetch(address, port, timeout):
+        if address == "10.0.0.2":
+            raise TimeoutError("too slow")
+        return {"hostname": "abc123", "uptime_seconds": 4.0}
+
+    results = poll(["10.0.0.1", "10.0.0.2"], 8000, fetch=fetch)
+
+    assert results[0] == {"address": "10.0.0.1", "ok": True,
+                          "hostname": "abc123", "uptime_seconds": 4.0}
+    assert results[1] == {"address": "10.0.0.2", "ok": False, "error": "TimeoutError"}
+
+
+# --- counters read back out of the metrics registry --------------------------
+
+
+def test_counters_are_summed_out_of_the_registry(client):
+    client.get("/api/info")
+    client.get("/api/info")
+
+    counters = read_counters(client.application.config["METRIC_REGISTRY"])
+
+    assert counters["requests_total"] >= 2
+    assert counters["request_seconds_count"] >= 2
+    assert counters["request_seconds_sum"] > 0
+    assert counters["errors_total"] == 0
+
+
+# --- the fleet API -----------------------------------------------------------
+
+
+def test_instance_endpoint_does_not_count_a_visit(client):
+    before = client.get("/api/info").get_json()["visits"]
+    client.get("/api/instance")
+    client.get("/api/instance")
+    after = client.get("/api/info").get_json()["visits"]
+
+    # The console polls this endpoint constantly. If it counted, the console
+    # would be measuring itself.
+    assert after == before + 1
+
+
+def test_instance_endpoint_reports_counters(client):
+    body = client.get("/api/instance").get_json()
+
+    assert body["hostname"]
+    assert "requests_total" in body["counters"]
+    assert "visits" in body
+
+
+def test_fleet_endpoint_always_includes_this_instance(client):
+    body = client.get("/api/fleet").get_json()
+
+    # With no peer service configured the fleet is one: itself.
+    assert body["discovered"] == 1
+    assert body["reachable"] == 1
+    assert body["instances"][0]["hostname"] == socket.gethostname()
+    assert body["instances"][0]["self"] is True
+
+
+def test_console_polling_is_kept_out_of_request_metrics(client):
+    client.get("/api/fleet")
+    client.get("/api/instance")
+
+    body = client.get("/metrics").get_data(as_text=True)
+    assert "main.fleet" not in body
+    assert "main.instance" not in body

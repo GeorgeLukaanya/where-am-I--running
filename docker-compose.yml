@@ -17,6 +17,11 @@ services:
       # this network -- that is service discovery, and it is why the same image
       # needs no rebuild to find Redis in any other environment.
       REDIS_URL: redis://redis:6379/0
+      # The service name every replica resolves to find its peers. Docker's
+      # DNS returns one record per replica, so the fleet view follows
+      # `--scale` with no configuration change.
+      PEER_SERVICE: web
+      PEER_PORT: "8000"
     expose:
       - "8000"
     depends_on:

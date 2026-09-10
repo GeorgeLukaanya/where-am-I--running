@@ -7,9 +7,11 @@ import time
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 
-from app.identity import accent_hue
+from app import fleet
+from app.identity import accent_slot, assign_slots
 from app.limits import read_limits
 from app.metrics import record_visit
+from app.telemetry import current_registry, read_counters
 
 bp = Blueprint("main", __name__)
 
@@ -45,13 +47,69 @@ def visit_info() -> dict:
 def index():
     info = {**build_info(), **visit_info()}
     # Tint server-side so the page is already the right colour on first paint,
-    # and still correct with JavaScript switched off.
-    return render_template("index.html", info=info, hue=accent_hue(info["hostname"]))
+    # and still correct with JavaScript switched off. This is the instance's
+    # preferred slot; the fleet view may move it to avoid a collision.
+    return render_template("index.html", info=info, slot=accent_slot(info["hostname"]))
 
 
 @bp.get("/api/info")
 def api_info():
     return jsonify({**build_info(), **visit_info()})
+
+
+def instance_report() -> dict:
+    """Everything one instance can say about itself, without changing anything.
+
+    Deliberately does not record a visit and is excluded from request metrics:
+    the console polls this on a timer, and an observer that shows up in its own
+    measurements is not an observer.
+    """
+    counter = current_app.config["COUNTER"]
+    return {
+        **build_info(),
+        "counters": read_counters(current_registry(current_app)),
+        "visits": counter.read(),
+        "counter_backend": counter.backend,
+    }
+
+
+@bp.get("/api/instance")
+def instance():
+    return jsonify(instance_report())
+
+
+@bp.get("/api/fleet")
+def fleet_view():
+    """Every instance behind the configured service name, including this one.
+
+    Peers are resolved fresh on each call rather than cached, so scaling up or
+    down is reflected within one poll and nothing has to be told about it.
+    """
+    port = int(os.getenv("PEER_PORT", "8000"))
+    peers = fleet.discover(port=port)
+    mine = socket.gethostname()
+
+    reports = fleet.poll(peers, port) if peers else []
+    if not any(r.get("hostname") == mine for r in reports):
+        # Either no peer service is configured, or this instance did not answer
+        # its own address. Either way the console must still see it.
+        reports.append({"address": "self", "ok": True, **instance_report()})
+
+    for report in reports:
+        report["self"] = report.get("hostname") == mine
+
+    reports.sort(key=lambda r: (not r["ok"], r.get("hostname") or r["address"]))
+
+    slots = assign_slots([r["hostname"] for r in reports if r.get("hostname")])
+    for report in reports:
+        report["slot"] = slots.get(report.get("hostname"))
+
+    return jsonify({
+        "discovered": len(reports),
+        "reachable": sum(1 for r in reports if r["ok"]),
+        "source": f"dns:{os.getenv('PEER_SERVICE')}" if os.getenv("PEER_SERVICE") else "self",
+        "instances": reports,
+    })
 
 
 MAX_SLEEP_SECONDS = 30

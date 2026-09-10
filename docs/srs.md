@@ -143,6 +143,8 @@ No user is authenticated, and no user-specific data exists.
 | GET | `/health` | `200` — alias of `/health/live` |
 | GET | `/health/live` | `200` `{"status":"ok"}` |
 | GET | `/health/ready` | `200` `{"status":"ready"}` or `503` `{"status":"shutting down"}` |
+| GET | `/api/instance` | `200` this instance's facts and counters; records no visit |
+| GET | `/api/fleet` | `200` every instance behind the peer service, each with a colour slot |
 | GET | `/metrics` | `200` Prometheus exposition format |
 | GET | `/api/slow?seconds=N` | `200` after waiting, or `400` if `N` is not a number |
 
@@ -161,6 +163,8 @@ and the service starts with none of them set.
 | `PORT` | `8000` | Listening port |
 | `REDIS_URL` | *(unset)* | When set, visits are counted in Redis |
 | `READINESS_MARKER` | `/tmp/shutdown` | Path whose existence fails readiness |
+| `PEER_SERVICE` | *(unset)* | Service name resolved to find peer instances |
+| `PEER_PORT` | `8000` | Port peers are polled on |
 | `PROMETHEUS_MULTIPROC_DIR` | *(unset)* | Directory workers share metric state through |
 
 ### 3.2 Functional requirements
@@ -221,6 +225,20 @@ and the service starts with none of them set.
 - **FR-19** The service shall provide an endpoint that delays its response by a
   caller-specified duration, bounded by a fixed maximum, so that draining can
   be observed. Invalid input shall be rejected with `400`.
+
+**Fleet awareness**
+
+- **FR-20** The service shall resolve a configured service name to discover
+  every peer instance, re-resolving on each request so that scaling is
+  reflected without configuration or restart.
+- **FR-21** The service shall report each peer's identity, build, limits and
+  counters, and shall report a peer that does not answer as unreachable
+  rather than omitting it or failing the request.
+- **FR-22** The service shall assign each instance a distinct colour slot from
+  a fixed palette, stable for a given fleet regardless of the order in which
+  peers were discovered.
+- **FR-23** Reading an instance's state shall not alter it: the fleet endpoints
+  shall record no visit and shall be excluded from request metrics.
 
 ### 3.3 Non-functional requirements
 
@@ -288,6 +306,9 @@ and the service starts with none of them set.
 | FR-16 | `app/metrics.py` `EXCLUDED_PATHS` | `test_health_checks_are_kept_out_of_request_metrics` |
 | FR-17 | `app/metrics.py`, `gunicorn.conf.py` | Manual: 20 requests across 2 workers sum to 20 |
 | FR-18 | `Dockerfile` `CMD` (`exec`), `gunicorn.conf.py` | Manual: in-flight request completes during `docker stop` |
+| FR-20, FR-21 | `app/fleet.py` | `test_discovery_returns_every_address_behind_the_name`, `test_poll_reports_reachable_and_unreachable_peers` |
+| FR-22 | `app/identity.py` `assign_slots` | `test_every_instance_in_a_fleet_gets_a_distinct_colour`, `test_slot_assignment_does_not_depend_on_arrival_order` |
+| FR-23 | `app/main.py`, `app/metrics.py` | `test_instance_endpoint_does_not_count_a_visit`, `test_console_polling_is_kept_out_of_request_metrics` |
 | FR-19 | `app/main.py` `slow()` | `test_slow_endpoint_waits_before_answering`, `test_slow_endpoint_caps_the_wait`, `test_slow_endpoint_rejects_nonsense` |
 | NFR-7, NFR-8 | `Dockerfile` multi-stage, `USER appuser` | Manual: `docker exec … id` |
 | NFR-9, NFR-10, NFR-12 | `.github/workflows/docker-build.yml` | The pipeline itself |
